@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 import sqlite3
 import os
 from datetime import datetime
@@ -7,6 +7,7 @@ import cv2
 import pytesseract
 import re
 import pyttsx3
+import threading
 
 # ==================== CONFIG ====================
 app = Flask(__name__)
@@ -25,6 +26,15 @@ DEPARTMENT_KEYWORDS = [
 ]
 IGNORE_KEYWORDS = ["college", "institute", "principal", "validity", "year", "batch"]
 
+# Store latest OCR result globally for /ocr_results
+latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
+
+# Auto-stop / auto-restart control
+capture_active = True
+pause_duration = 3  # seconds
+lock = threading.Lock()
+last_saved_reg_no = None
+
 # ==================== AUTH DECORATOR ====================
 def login_required(f):
     @wraps(f)
@@ -34,7 +44,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ==================== OCR FUNCTION ====================
+# ==================== OCR FUNCTIONS ====================
 def extract_id_number(lines):
     POSSIBLE_LABELS = ["reg no", "registration no", "reg. no", "regno", "regn no", "regn.", "reg"]
     for line in lines:
@@ -44,100 +54,130 @@ def extract_id_number(lines):
                 return match.group(1)
     return "Not found"
 
-def run_ocr_and_save():
-    cap = cv2.VideoCapture(0)
-    print("📡 Scanning for ID card... Show the card to the camera.")
+def save_to_database(data):
+    conn = sqlite3.connect("library_visitors.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS visitors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT,
+            name TEXT,
+            department TEXT,
+            visit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO visitors (student_id, name, department)
+        VALUES (?, ?, ?)
+    """, (data["reg_no"], data["name"], data["department"]))
+    conn.commit()
+    conn.close()
 
-    extracted = False
-    name, reg_no, department, ocr_text = "Not found", "Not found", "Not found", ""
+def speak_message(msg):
+    engine = pyttsx3.init()
+    engine.say(msg)
+    engine.runAndWait()
 
-    while not extracted:
-        ret, frame = cap.read()
-        if not ret:
-            print("❌ Camera error.")
+def resume_capture():
+    global capture_active
+    capture_active = True
+
+def process_frame_for_ocr(frame):
+    global latest_ocr_data, capture_active, last_saved_reg_no
+
+    if not capture_active:
+        return
+
+    h, w, _ = frame.shape
+    top = int(h * 0.55)
+    bottom = int(h * 0.95)
+    left = int(w * 0.15)
+    right = int(w * 0.85)
+
+    cropped = frame[top:bottom, left:right]
+    gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+    resized = cv2.resize(gray, None, fx=1.8, fy=1.8, interpolation=cv2.INTER_CUBIC)
+
+    ocr_text = pytesseract.image_to_string(resized, config="--oem 3 --psm 6")
+    lines = [line.strip() for line in ocr_text.split('\n') if line.strip()]
+
+    reg_no = extract_id_number(lines)
+    department = "Not found"
+    name = "Not found"
+
+    for line in lines:
+        for dept in DEPARTMENT_KEYWORDS:
+            if dept.lower() in line.lower():
+                department = dept.upper()
+                break
+        if department != "Not found":
             break
 
+    for line in lines:
+        if any(word in line.lower() for word in IGNORE_KEYWORDS):
+            continue
+        words = line.split()
+        if 1 < len(words) <= 4 and all(w.isalpha() or '.' in w for w in words):
+            name = line.strip().title()
+            break
+
+    latest_ocr_data = {
+        "name": name,
+        "reg_no": reg_no,
+        "department": department
+    }
+
+    # If all fields are found and not already saved
+    if name != "Not found" and reg_no != "Not found" and department != "Not found":
+        with lock:
+            if last_saved_reg_no != reg_no:
+                last_saved_reg_no = reg_no
+                save_to_database(latest_ocr_data)
+                speak_message("Details captured successfully")
+                capture_active = False
+
+
+# ==================== VIDEO STREAM GENERATOR ====================
+def gen_frames():
+    cap = cv2.VideoCapture(0)
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+
+        process_frame_for_ocr(frame)
+
+        # Draw rectangle for visual aid
         h, w, _ = frame.shape
         top = int(h * 0.55)
         bottom = int(h * 0.95)
         left = int(w * 0.15)
         right = int(w * 0.85)
-
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-        cv2.putText(frame, "Scanning for ID card fields...", (left, top - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-        cv2.imshow("ID Card Scanner", frame)
-        cv2.moveWindow("ID Card Scanner", 10, 20)
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
 
-        cropped = frame[top:bottom, left:right]
-        gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, None, fx=1.8, fy=1.8, interpolation=cv2.INTER_CUBIC)
-
-        ocr_text = pytesseract.image_to_string(resized, config="--oem 3 --psm 6")
-        lines = [line.strip() for line in ocr_text.split('\n') if line.strip()]
-
-        reg_no = extract_id_number(lines)
-
-        for line in lines:
-            for dept in DEPARTMENT_KEYWORDS:
-                if dept.lower() in line.lower():
-                    department = dept.upper()
-                    break
-            if department != "Not found":
-                break
-
-        for line in lines:
-            if any(word in line.lower() for word in IGNORE_KEYWORDS):
-                continue
-            words = line.split()
-            if 1 < len(words) <= 4 and all(w.isalpha() or '.' in w for w in words):
-                name = line.strip().title()
-                break
-
-        if len(reg_no) == 14 and department.strip().lower() == "mca" and name != "Not found":
-            engine = pyttsx3.init()
-            engine.say("Details captured successfully.")
-            engine.runAndWait()
-
-            conn = sqlite3.connect('library_visitors.db')
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO visitors (student_id, name, visit_time, face_match_status, department)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (reg_no, name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'pending', department))
-            conn.commit()
-            conn.close()
-            print("✅ Data saved to database.")
-            extracted = True
-            break
-
-        if cv2.waitKey(1) & 0xFF == 27:
-            print("❌ ESC pressed. Exiting.")
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-    return name, reg_no, department, ocr_text
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
 # ==================== ROUTES ====================
 @app.route('/')
 def home():
-    # Run OCR and show results page (not dashboard directly)
-    name, reg_no, department, ocr_text = run_ocr_and_save()
-    return render_template('scan_result.html',
-                           name=name,
-                           reg_no=reg_no,
-                           department=department)
+    return render_template('live_scan.html')
 
-@app.route('/scan')
-def scan():
-    name, reg_no, department, ocr_text = run_ocr_and_save()
-    flash("New visitor scanned successfully!", "success")
-    return render_template('scan_result.html',
-                           name=name,
-                           reg_no=reg_no,
-                           department=department)
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/ocr_results')
+def ocr_results():
+    global capture_active
+    return jsonify({
+        **latest_ocr_data,
+        "capture_active": capture_active
+    })
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -190,6 +230,14 @@ def get_live_visitors():
     rows = cursor.fetchall()
     conn.close()
     return jsonify(rows)
+@app.route('/resume_capture', methods=['POST'])
+def resume_capture_route():
+    global capture_active, latest_ocr_data
+    with lock:
+        capture_active = True
+        latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
+    return jsonify({"status": "ok"})
+
 
 
 # ==================== MAIN ====================

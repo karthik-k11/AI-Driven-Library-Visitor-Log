@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live ID Card Scan</title>
+    <style>
+        body { font-family: Arial; text-align: center; background: #f4f4f4; }
+        .container { max-width: 800px; margin: auto; padding: 20px; }
+        video, img { border: 2px solid #ccc; border-radius: 8px; }
+        .ocr-data { background: #fff; padding: 15px; margin-top: 15px; border-radius: 8px; }
+        button { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="ocr-data">
+    <p><strong>Name:</strong> <span id="name">Scanning...</span></p>
+    <p><strong>Reg No:</strong> <span id="reg_no">Scanning...</span></p>
+    <p><strong>Department:</strong> <span id="department">Scanning...</span></p>
+
+    <!-- Add this button -->
+    <button id="yesEnterBtn" style="display:none; margin-top: 15px; padding: 8px 20px; font-size: 16px; background: #28a745; color: white; border:none; border-radius: 5px;">
+      Yes, Enter
+    </button>
+</div>
+
+
+    <script>
+    let captureActive = true;
+
+    async function updateOCR() {
+    const res = await fetch('/ocr_results');
+    const data = await res.json();
+
+    document.getElementById('name').textContent = data.name;
+    document.getElementById('reg_no').textContent = data.reg_no;
+    document.getElementById('department').textContent = data.department;
+
+    // Sync front-end captureActive with backend
+    captureActive = data.capture_active;
+
+    if (!captureActive && data.name !== "Not found" && data.reg_no !== "Not found" && data.department !== "Not found") {
+        document.getElementById('yesEnterBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('yesEnterBtn').style.display = 'none';
+    }
+}
+
+    // Poll OCR results every second
+    setInterval(updateOCR, 1000);
+
+    // Listen to Yes Enter button click
+    document.getElementById('yesEnterBtn').addEventListener('click', async () => {
+        // Tell backend to resume capture and clear fields
+        const res = await fetch('/resume_capture', { method: 'POST' });
+        if (res.ok) {
+            // Clear displayed fields immediately on frontend
+            document.getElementById('name').textContent = "Scanning...";
+            document.getElementById('reg_no').textContent = "Scanning...";
+            document.getElementById('department').textContent = "Scanning...";
+            captureActive = true;
+            document.getElementById('yesEnterBtn').style.display = 'none';
+        }
+    });
+    captureActive = true;
+
+async function updateOCR() {
+    const res = await fetch('/ocr_results');
+    const data = await res.json();
+
+    document.getElementById('name').textContent = data.name;
+    document.getElementById('reg_no').textContent = data.reg_no;
+    document.getElementById('department').textContent = data.department;
+
+    // Show the button only when OCR is paused (captureActive == false) and valid data found
+    if (!captureActive && data.name !== "Not found" && data.reg_no !== "Not found" && data.department !== "Not found") {
+        document.getElementById('yesEnterBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('yesEnterBtn').style.display = 'none';
+    }
+}
+
+// Poll OCR every 1 second
+setInterval(updateOCR, 1000);
+
+// Listen for button click to resume capture
+document.getElementById('yesEnterBtn').addEventListener('click', async () => {
+    const res = await fetch('/resume_capture', { method: 'POST' });
+    if (res.ok) {
+        // Clear displayed OCR fields immediately
+        document.getElementById('name').textContent = "Scanning...";
+        document.getElementById('reg_no').textContent = "Scanning...";
+        document.getElementById('department').textContent = "Scanning...";
+        captureActive = true;
+        document.getElementById('yesEnterBtn').style.display = 'none';
+    }
+});
+
+    </script>
+
+</body>
+</html>
