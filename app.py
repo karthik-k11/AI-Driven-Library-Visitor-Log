@@ -176,6 +176,22 @@ def get_visitors():
     conn.close()
     return jsonify(rows)
 
+@app.route('/get_live_visitors')
+def get_live_visitors():
+    today = datetime.now().strftime("%Y-%m-%d")
+    conn = sqlite3.connect("library_visitors.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, student_id, name, department, visit_time
+        FROM visitors
+        WHERE DATE(visit_time) = DATE(?)
+        ORDER BY visit_time DESC
+    """, (today,))
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify(rows)
+
+
 # ==================== MAIN ====================
 if __name__ == '__main__':
     app.run(debug=True)
