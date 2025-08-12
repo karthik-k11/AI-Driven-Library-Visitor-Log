@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Library Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="p-3">
+
+<div class="container">
+    <!-- Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Library Visitors Dashboard</h2>
+        <div>
+            <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+        </div>
+    </div>
+
+    <!-- Live visitors -->
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <div>Live Visitors Today: <span id="liveCount">0</span></div>
+        <button id="toggleLiveBtn" class="btn btn-sm btn-outline-dark">Show Live Visitors</button>
+    </div>
+
+    <!-- Search filters -->
+    <div class="card p-3 mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <input type="text" id="searchID" class="form-control" placeholder="Search by Student ID">
+            </div>
+            <div class="col-md-3">
+                <input type="text" id="searchDept" class="form-control" placeholder="Search by Department">
+            </div>
+            <div class="col-md-3">
+                <input type="date" id="startDate" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <input type="date" id="endDate" class="form-control">
+            </div>
+        </div>
+        <div class="mt-3">
+            <button id="searchBtn" class="btn btn-primary">Search</button>
+            <button id="resetBtn" class="btn btn-secondary">Reset</button>
+            <button id="exportCsvBtn" class="btn btn-success">Export to CSV</button>
+            <form action="/delete_all" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete all records?');">
+                <button type="submit" class="btn btn-warning">Delete All Records</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Visitors table -->
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Visit Time</th>
+            </tr>
+        </thead>
+        <tbody id="visitorTable">
+            <tr><td colspan="5" class="text-center">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    
+let liveMode = false;
+let refreshInterval;
+
+function loadVisitors() {
+    $.getJSON("/get_visitors", function(data) {
+        renderTable(data);
+    });
+}
+
+function loadLiveVisitorsTable() {
+    $.getJSON("/get_live_visitors", function(data) {
+        renderTable(data);
+    });
+}
+
+function loadLiveCount() {
+    $.getJSON("/get_live_visitors", function(data) {
+        $("#liveCount").text(data.length);
+    });
+}
+
+function renderTable(data) {
+    let rows = "";
+    if (data.length === 0) {
+        rows = "<tr><td colspan='5' class='text-center'>No records found</td></tr>";
+    } else {
+        data.forEach(function(visitor) {
+            rows += `
+                <tr>
+                    <td>${visitor[0]}</td>
+                    <td>${visitor[1]}</td>
+                    <td>${visitor[2]}</td>
+                    <td>${visitor[3]}</td>
+                    <td>${visitor[4]}</td>
+                </tr>
+            `;
+        });
+    }
+    $("#visitorTable").html(rows);
+}
+
+// Search
+$("#searchBtn").click(function() {
+    let id = $("#searchID").val();
+    let dept = $("#searchDept").val();
+    let start = $("#startDate").val();
+    let end = $("#endDate").val();
+
+    $.getJSON("/search_visitors", {
+        student_id: id,
+        department: dept,
+        start_date: start,
+        end_date: end
+    }, function(data) {
+        renderTable(data);
+    });
+});
+
+// Reset
+$("#resetBtn").click(function() {
+    $("#searchID").val("");
+    $("#searchDept").val("");
+    $("#startDate").val("");
+    $("#endDate").val("");
+    loadVisitors();
+});
+$("#exportCsvBtn").click(function() {
+    let id = $("#searchID").val();
+    let dept = $("#searchDept").val();
+    let start = $("#startDate").val();
+    let end = $("#endDate").val();
+
+    let params = new URLSearchParams();
+    if (id) params.append("student_id", id);
+    if (dept) params.append("department", dept);
+    if (start) params.append("start_date", start);
+    if (end) params.append("end_date", end);
+
+    window.location = "/export_csv?" + params.toString();
+});
+
+// Toggle Live Visitors Mode
+$("#toggleLiveBtn").click(function() {
+    liveMode = !liveMode;
+    if (liveMode) {
+        $(this).text("Show All Visitors").removeClass("btn-outline-dark").addClass("btn-outline-primary");
+        loadLiveVisitorsTable();
+        refreshInterval = setInterval(function() {
+            loadLiveCount();
+            loadLiveVisitorsTable();
+        }, 5000);
+    } else {
+        $(this).text("Show Today's Visitors").removeClass("btn-outline-primary").addClass("btn-outline-dark");
+        clearInterval(refreshInterval);
+        loadVisitors();
+        loadLiveCount();
+    }
+});
+
+// Initial Load
+loadVisitors();
+loadLiveCount();
+setInterval(loadLiveCount, 5000);
+</script>
+
+</body>
+</html>
