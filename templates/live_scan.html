@@ -49,12 +49,23 @@
 
         setInterval(updateOCR, 1000);
         // >>> NEW <<< Save visitor
-        function saveVisitor() {
-        fetch('/save_visitor', { method: 'POST' })
-        .then(() => {
-            document.getElementById('action-buttons').style.display = 'none';
-        });
+       function saveVisitor() {
+    const payload = {
+        name: document.getElementById('name').textContent,
+        reg_no: document.getElementById('reg_no').textContent,
+        department: document.getElementById('department').textContent
+    };
+
+    fetch('/save_visitor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(() => {
+        document.getElementById('action-buttons').style.display = 'none';
+    });
 }
+
 
         // >>> NEW <<< Resume capture without saving
         function resumeCapture() {

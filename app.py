@@ -203,7 +203,7 @@ def dashboard():
 
 @app.route('/get_visitors')
 def get_visitors():
-    conn = sqlite3.connect("library_visitors.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT id, student_id, name, department, visit_time
@@ -217,7 +217,7 @@ def get_visitors():
 @app.route('/get_live_visitors')
 def get_live_visitors():
     today = datetime.now().strftime("%Y-%m-%d")
-    conn = sqlite3.connect("library_visitors.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT id, student_id, name, department, visit_time
@@ -238,16 +238,22 @@ def resume_capture_route():
         latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
     return jsonify({"status": "ok"})
 
-# >>> NEW <<< --- Manual save endpoint
 @app.route('/save_visitor', methods=['POST'])
 def save_visitor():
-    global capture_active, latest_ocr_data, last_saved_reg_no
-    save_to_database(latest_ocr_data)
-    last_saved_reg_no = latest_ocr_data["reg_no"]
-    capture_active = True
-    latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
-    return jsonify({"status": "ok"})
+    global capture_active, last_saved_reg_no
 
+    data = request.get_json()  # Read data from frontend
+
+    if (data["name"] != "Not found" and
+        data["reg_no"] != "Not found" and
+        data["department"] != "Not found"):
+
+        save_to_database(data)
+        last_saved_reg_no = data["reg_no"]
+        speak_message("Entry saved successfully")
+
+    capture_active = True
+    return jsonify({"status": "ok"})
 
 # ==================== MAIN ====================
 if __name__ == '__main__':
