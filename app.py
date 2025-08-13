@@ -58,6 +58,8 @@ def extract_id_number(lines):
     return "Not found"
 
 def save_to_database(data):
+    print("📂 Saving to DB file:", os.path.abspath(DB_PATH))
+    print(f"Saving to database at: {DB_PATH}")  # debug print
     conn = sqlite3.connect(DB_PATH)  # >>> CHANGED <<<
     cursor = conn.cursor()
     cursor.execute("""
@@ -73,6 +75,8 @@ def save_to_database(data):
         INSERT INTO visitors (student_id, name, department)
         VALUES (?, ?, ?)
     """, (data["reg_no"], data["name"], data["department"]))
+    print("✅ Row inserted:", data)
+
     conn.commit()
     conn.close()
 
@@ -203,6 +207,7 @@ def dashboard():
 
 @app.route('/get_visitors')
 def get_visitors():
+    print("📂 Reading from DB file:", os.path.abspath(DB_PATH))
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -241,16 +246,15 @@ def resume_capture_route():
 @app.route('/save_visitor', methods=['POST'])
 def save_visitor():
     global capture_active, last_saved_reg_no
+    print("✅ /save_visitor endpoint CALLED")
+    data = request.get_json()
+    print("📦 Data received:", data)
+    print("Saving visitor data:", data)  # debug print
+    print(f"Database path: {DB_PATH}")
 
-    data = request.get_json()  # Read data from frontend
-
-    if (data["name"] != "Not found" and
-        data["reg_no"] != "Not found" and
-        data["department"] != "Not found"):
-
-        save_to_database(data)
-        last_saved_reg_no = data["reg_no"]
-        speak_message("Entry saved successfully")
+    save_to_database(data)
+    last_saved_reg_no = data["reg_no"]
+    speak_message("Entry saved successfully")
 
     capture_active = True
     return jsonify({"status": "ok"})
