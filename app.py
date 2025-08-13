@@ -58,25 +58,13 @@ def extract_id_number(lines):
     return "Not found"
 
 def save_to_database(data):
-    print("📂 Saving to DB file:", os.path.abspath(DB_PATH))
-    print(f"Saving to database at: {DB_PATH}")  # debug print
-    conn = sqlite3.connect(DB_PATH)  # >>> CHANGED <<<
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    visit_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS visitors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id TEXT,
-            name TEXT,
-            department TEXT,
-            visit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        INSERT INTO visitors (student_id, name, department)
-        VALUES (?, ?, ?)
-    """, (data["reg_no"], data["name"], data["department"]))
-    print("✅ Row inserted:", data)
-
+    INSERT INTO visitors (student_id, name, department, visit_time)
+    VALUES (?, ?, ?, ?)
+""", (data['reg_no'], data['name'], data['department'], visit_time))
     conn.commit()
     conn.close()
 
