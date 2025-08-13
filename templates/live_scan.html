@@ -43,26 +43,36 @@
                 document.getElementById('action-buttons').style.display = 'block';
             } else {
                 document.getElementById('action-buttons').style.display = 'none';
+                saveInProgress = false;
             }
         });
 }
 
         setInterval(updateOCR, 1000);
-        // >>> NEW <<< Save visitor
-       function saveVisitor() {
-    const payload = {
-        name: document.getElementById('name').textContent,
-        reg_no: document.getElementById('reg_no').textContent,
-        department: document.getElementById('department').textContent
-    };
+        let saveInProgress = false;
 
-    fetch('/save_visitor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+function saveVisitor() {
+    if (saveInProgress) return; // Prevent double save
+    saveInProgress = true;
+
+    fetch("/save_visitor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            name: document.getElementById("name").textContent,
+            reg_no: document.getElementById("reg_no").textContent,
+            department: document.getElementById("department").textContent
+        })
     })
-    .then(() => {
+    .then(res => res.json())
+    .then(data => {
+        console.log("✅ Visitor saved", data);
         document.getElementById('action-buttons').style.display = 'none';
+        setTimeout(() => { saveInProgress = false; }, 1000); // Allow after 1 sec
+    })
+    .catch(err => {
+        console.error("❌ Save error", err);
+        saveInProgress = false;
     });
 }
 
@@ -74,22 +84,7 @@
             document.getElementById('action-buttons').style.display = 'none';
         });
 }
-    document.getElementById("yesButton").addEventListener("click", function() {
-    fetch("/save_visitor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            name: document.getElementById("name").innerText.replace("Name: ", ""),
-            reg_no: document.getElementById("reg_no").innerText.replace("Reg No: ", ""),
-            department: document.getElementById("department").innerText.replace("Department: ", "")
-        })
-    }).then(r => r.json())
-      .then(d => {
-          console.log("Saved:", d);
-          fetch("/resume_capture");
-      });
-});
-
+    
     </script>
 </body>
 </html>
