@@ -34,6 +34,9 @@ capture_active = True
 pause_duration = 3  # seconds
 lock = threading.Lock()
 last_saved_reg_no = None
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # >>> NEW <<<
+DB_PATH = os.path.join(BASE_DIR, "library_visitors.db")  # >>> NEW <<<
+
 
 # ==================== AUTH DECORATOR ====================
 def login_required(f):
@@ -55,7 +58,7 @@ def extract_id_number(lines):
     return "Not found"
 
 def save_to_database(data):
-    conn = sqlite3.connect("library_visitors.db")
+    conn = sqlite3.connect(DB_PATH)  # >>> CHANGED <<<
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS visitors (
@@ -128,13 +131,13 @@ def process_frame_for_ocr(frame):
     }
 
     # If all fields are found and not already saved
+   # Remove auto DB save from process_frame_for_ocr and just pause scanning:
     if name != "Not found" and reg_no != "Not found" and department != "Not found":
         with lock:
             if last_saved_reg_no != reg_no:
                 last_saved_reg_no = reg_no
-                save_to_database(latest_ocr_data)
                 speak_message("Details captured successfully")
-                capture_active = False
+                capture_active = False  # Stop scanning until user decides
 
 
 # ==================== VIDEO STREAM GENERATOR ====================
@@ -172,12 +175,7 @@ def video_feed():
 
 @app.route('/ocr_results')
 def ocr_results():
-    global capture_active
-    return jsonify({
-        **latest_ocr_data,
-        "capture_active": capture_active
-    })
-
+    return jsonify(latest_ocr_data)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -230,6 +228,8 @@ def get_live_visitors():
     rows = cursor.fetchall()
     conn.close()
     return jsonify(rows)
+
+# >>> NEW <<<  --- Manual resume endpoint
 @app.route('/resume_capture', methods=['POST'])
 def resume_capture_route():
     global capture_active, latest_ocr_data
@@ -238,6 +238,15 @@ def resume_capture_route():
         latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
     return jsonify({"status": "ok"})
 
+# >>> NEW <<< --- Manual save endpoint
+@app.route('/save_visitor', methods=['POST'])
+def save_visitor():
+    global capture_active, latest_ocr_data, last_saved_reg_no
+    save_to_database(latest_ocr_data)
+    last_saved_reg_no = latest_ocr_data["reg_no"]
+    capture_active = True
+    latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
+    return jsonify({"status": "ok"})
 
 
 # ==================== MAIN ====================
