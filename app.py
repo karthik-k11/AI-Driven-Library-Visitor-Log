@@ -247,6 +247,29 @@ def save_visitor():
     capture_active = True
     return jsonify({"status": "ok"})
 
+@app.route('/delete_visitors', methods=['POST'])
+@login_required
+def delete_visitors():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM visitors")
+    conn.commit()
+    conn.close()
+    flash("All visitor records deleted.", "success")
+    return jsonify({"status": "ok"})
+
+@app.route('/delete_all', methods=['POST'])
+@login_required
+def delete_all():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM visitors")
+    conn.commit()
+    conn.close()
+    flash("All visitor records deleted.", "success")
+    return redirect(url_for('dashboard'))
+
+
 # ==================== MAIN ====================
 if __name__ == '__main__':
     app.run(debug=True)
