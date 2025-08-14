@@ -22,7 +22,7 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 # OCR keywords
 DEPARTMENT_KEYWORDS = [
     "MCA", "MBA", "BCA", "BBA", "BTECH", "MTECH", "M.Com", "B.Sc", "M.Sc",
-    "CSE", "ECE", "student", "engineer", "developer", "librarian", "faculty"
+    "CSE","librarian", "faculty"
 ]
 IGNORE_KEYWORDS = ["college", "institute", "principal", "validity", "year", "batch"]
 
