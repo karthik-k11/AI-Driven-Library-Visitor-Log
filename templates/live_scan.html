@@ -7,8 +7,37 @@
         .container { max-width: 800px; margin: auto; padding: 20px; }
         video, img { border: 2px solid #ccc; border-radius: 8px; }
         .ocr-data { background: #fff; padding: 15px; margin-top: 15px; border-radius: 8px; }
-        button { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; }
+    
+        /* Button styling */
+        .btn {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+        .btn:hover {
+            background: #218838;
+        }
+        .btn-secondary {
+            background: #007bff;
+        }
+        .btn-secondary:hover {
+            background: #0056b3;
+    }
+
+        /* Align buttons neatly side-by-side */
+        #action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
     </style>
+
 </head>
 <body>
     <div class="container">
@@ -21,13 +50,17 @@
             <p><strong>Department:</strong> <span id="department">Scanning...</span></p>
         </div>
         <!-- >>> NEW <<< Action buttons -->
-        <div id="action-buttons" style="display:none; margin-top:10px;">
-            <button onclick="saveVisitor()">✅ Yes, Enter</button>
-            <button onclick="resumeCapture()">🔄 Retake</button>
-        </div>
+        <!-- Action buttons -->
+<div id="action-buttons" style="display:none;">
+    <button class="btn" onclick="saveVisitor()">Enter the Library</button>
+    <button class="btn btn-secondary" onclick="resumeCapture()">Capture my ID </button>
+</div>
 
-        <a href="{{ url_for('login') }}"><button>🔑 Librarian Login</button></a>
-    </div>
+<!-- Librarian login button -->
+<div style="margin-top: 20px;">
+    <a href="{{ url_for('login') }}"><button class="btn btn-secondary">Librarian Login</button></a>
+</div>
+
 
     <script>
         function updateOCR() {

@@ -8,8 +8,11 @@ import pytesseract
 import re
 import pyttsx3
 import threading
+import csv
+from io import StringIO
 
 # ==================== CONFIG ====================
+
 app = Flask(__name__)
 app.secret_key = "supersecretkey"  # Change in production
 
@@ -21,8 +24,8 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 
 # OCR keywords
 DEPARTMENT_KEYWORDS = [
-    "MCA", "MBA", "BCA", "BBA", "BTECH", "MTECH", "M.Com", "B.Sc", "M.Sc",
-    "CSE","librarian", "faculty"
+    "MCA", "MBA", "BCA", "BBA", "BTECH", "MTECH",
+    "M.Com", "B.Sc", "M.Sc", "CSE"
 ]
 IGNORE_KEYWORDS = ["college", "institute", "principal", "validity", "year", "batch"]
 
@@ -34,11 +37,12 @@ capture_active = True
 pause_duration = 3  # seconds
 lock = threading.Lock()
 last_saved_reg_no = None
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # >>> NEW <<<
-DB_PATH = os.path.join(BASE_DIR, "library_visitors.db")  # >>> NEW <<<
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "library_visitors.db")
 
 # ==================== AUTH DECORATOR ====================
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -48,38 +52,50 @@ def login_required(f):
     return decorated_function
 
 # ==================== OCR FUNCTIONS ====================
+
 def extract_id_number(lines):
-    POSSIBLE_LABELS = ["reg no", "registration no", "reg. no", "regno", "regn no", "regn.", "reg"]
+    POSSIBLE_LABELS = [
+        "reg no", "registration no", "reg. no", "regno",
+        "regn no", "regn.", "reg"
+    ]
     for line in lines:
         if any(label in line.lower() for label in POSSIBLE_LABELS):
-            match = re.search(r"reg(?:istration)?\.?\s*no[:\s]*([A-Z0-9]{6,})", line, re.IGNORECASE)
+            match = re.search(
+                r"reg(?:istration)?\.?\s*no[:\s]*([A-Z0-9]{6,})",
+                line,
+                re.IGNORECASE
+            )
             if match:
                 return match.group(1)
     return "Not found"
+
 
 def save_to_database(data):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     visit_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-    INSERT INTO visitors (student_id, name, department, visit_time)
-    VALUES (?, ?, ?, ?)
-""", (data['reg_no'], data['name'], data['department'], visit_time))
+    cursor.execute(
+        """INSERT INTO visitors (student_id, name, department, visit_time)
+           VALUES (?, ?, ?, ?)""",
+        (data['reg_no'], data['name'], data['department'], visit_time)
+    )
     conn.commit()
     conn.close()
+
 
 def speak_message(msg):
     engine = pyttsx3.init()
     engine.say(msg)
     engine.runAndWait()
 
+
 def resume_capture():
     global capture_active
     capture_active = True
 
+
 def process_frame_for_ocr(frame):
     global latest_ocr_data, capture_active, last_saved_reg_no
-
     if not capture_active:
         return
 
@@ -97,6 +113,7 @@ def process_frame_for_ocr(frame):
     lines = [line.strip() for line in ocr_text.split('\n') if line.strip()]
 
     reg_no = extract_id_number(lines)
+
     department = "Not found"
     name = "Not found"
 
@@ -122,27 +139,24 @@ def process_frame_for_ocr(frame):
         "department": department
     }
 
-    # If all fields are found and not already saved
-   # Remove auto DB save from process_frame_for_ocr and just pause scanning:
     if name != "Not found" and reg_no != "Not found" and department != "Not found":
         with lock:
             if last_saved_reg_no != reg_no:
                 last_saved_reg_no = reg_no
                 speak_message("Details captured successfully")
-                capture_active = False  # Stop scanning until user decides
+                capture_active = False
 
 
 # ==================== VIDEO STREAM GENERATOR ====================
+
 def gen_frames():
     cap = cv2.VideoCapture(0)
     while True:
         success, frame = cap.read()
         if not success:
             break
-
         process_frame_for_ocr(frame)
 
-        # Draw rectangle for visual aid
         h, w, _ = frame.shape
         top = int(h * 0.55)
         bottom = int(h * 0.95)
@@ -152,22 +166,27 @@ def gen_frames():
 
         ret, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        yield (
+            b'--frame\r\n'
+            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
+        )
 
 # ==================== ROUTES ====================
+
 @app.route('/')
 def home():
     return render_template('live_scan.html')
+
 
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
 @app.route('/ocr_results')
 def ocr_results():
     return jsonify(latest_ocr_data)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -182,47 +201,85 @@ def login():
             flash("Invalid username or password", "danger")
     return render_template('login.html')
 
+
 @app.route('/logout')
 def logout():
     session.clear()
     flash("You have been logged out.", "info")
     return redirect(url_for('login'))
 
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
     return render_template('dashboard.html')
 
+
+# ==================== SEARCH VISITORS ====================
+
+@app.route("/search_visitors")
+def search_visitors():
+    student_id = request.args.get("student_id", "").strip()
+    department = request.args.get("department", "").strip()
+    start_date = request.args.get("start_date", "").strip()
+    end_date = request.args.get("end_date", "").strip()
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    query = "SELECT id, student_id, name, department, visit_time FROM visitors WHERE 1=1"
+    params = []
+
+    if student_id:
+        query += " AND student_id LIKE ?"
+        params.append(f"%{student_id}%")
+    if department:
+        query += " AND department LIKE ?"
+        params.append(f"%{department}%")
+    if start_date:
+        query += " AND DATE(visit_time) >= DATE(?)"
+        params.append(start_date)
+    if end_date:
+        query += " AND DATE(visit_time) <= DATE(?)"
+        params.append(end_date)
+
+    query += " ORDER BY id DESC"
+
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+    return jsonify(rows)
+
+
 @app.route('/get_visitors')
 def get_visitors():
-    print("📂 Reading from DB file:", os.path.abspath(DB_PATH))
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, student_id, name, department, visit_time
-        FROM visitors
-        ORDER BY visit_time DESC
-    """)
+    cursor.execute(
+        """SELECT id, student_id, name, department, visit_time
+           FROM visitors ORDER BY visit_time DESC"""
+    )
     rows = cursor.fetchall()
     conn.close()
     return jsonify(rows)
+
 
 @app.route('/get_live_visitors')
 def get_live_visitors():
     today = datetime.now().strftime("%Y-%m-%d")
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, student_id, name, department, visit_time
-        FROM visitors
-        WHERE DATE(visit_time) = DATE(?)
-        ORDER BY visit_time DESC
-    """, (today,))
+    cursor.execute(
+        """SELECT id, student_id, name, department, visit_time
+           FROM visitors WHERE DATE(visit_time) = DATE(?)
+           ORDER BY visit_time DESC""",
+        (today,)
+    )
     rows = cursor.fetchall()
     conn.close()
     return jsonify(rows)
 
-# >>> NEW <<<  --- Manual resume endpoint
+
 @app.route('/resume_capture', methods=['POST'])
 def resume_capture_route():
     global capture_active, latest_ocr_data
@@ -231,21 +288,17 @@ def resume_capture_route():
         latest_ocr_data = {"name": "Not found", "reg_no": "Not found", "department": "Not found"}
     return jsonify({"status": "ok"})
 
+
 @app.route('/save_visitor', methods=['POST'])
 def save_visitor():
     global capture_active, last_saved_reg_no
-    print("✅ /save_visitor endpoint CALLED")
     data = request.get_json()
-    print("📦 Data received:", data)
-    print("Saving visitor data:", data)  # debug print
-    print(f"Database path: {DB_PATH}")
-
     save_to_database(data)
     last_saved_reg_no = data["reg_no"]
     speak_message("Entry saved successfully")
-
     capture_active = True
     return jsonify({"status": "ok"})
+
 
 @app.route('/delete_visitors', methods=['POST'])
 @login_required
@@ -257,6 +310,7 @@ def delete_visitors():
     conn.close()
     flash("All visitor records deleted.", "success")
     return jsonify({"status": "ok"})
+
 
 @app.route('/delete_all', methods=['POST'])
 @login_required
@@ -270,6 +324,52 @@ def delete_all():
     return redirect(url_for('dashboard'))
 
 
+@app.route('/export_csv')
+@login_required
+def export_csv():
+    student_id = request.args.get("student_id", "")
+    department = request.args.get("department", "")
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    query = "SELECT id, student_id, name, department, visit_time FROM visitors WHERE 1=1"
+    params = []
+
+    if student_id:
+        query += " AND student_id LIKE ?"
+        params.append(f"%{student_id}%")
+    if department:
+        query += " AND department LIKE ?"
+        params.append(f"%{department}%")
+    if start_date:
+        query += " AND DATE(visit_time) >= DATE(?)"
+        params.append(start_date)
+    if end_date:
+        query += " AND DATE(visit_time) <= DATE(?)"
+        params.append(end_date)
+
+    query += " ORDER BY visit_time DESC"
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(["ID", "Student ID", "Name", "Department", "Visit Time"])
+    cw.writerows(rows)
+    output = si.getvalue()
+    si.close()
+
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=visitors.csv"}
+    )
+
 # ==================== MAIN ====================
+
 if __name__ == '__main__':
     app.run(debug=True)
