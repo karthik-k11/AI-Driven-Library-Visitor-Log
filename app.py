@@ -128,10 +128,15 @@ def process_frame_for_ocr(frame):
     for line in lines:
         if any(word in line.lower() for word in IGNORE_KEYWORDS):
             continue
+    
+        if "course mca" in line.lower():
+            continue
+
         words = line.split()
         if 1 < len(words) <= 4 and all(w.isalpha() or '.' in w for w in words):
             name = line.strip().title()
             break
+
 
     latest_ocr_data = {
         "name": name,
