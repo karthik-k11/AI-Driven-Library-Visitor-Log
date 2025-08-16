@@ -1,32 +1,168 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login - Library Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Visitor Log - Login</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #2c3e50;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 10px 40px rgba(0,0,0,0.4);
+            width: 320px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            animation: fadeIn 0.9s ease-in-out;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        h2 {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+            letter-spacing: 1px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 35px 10px 12px;
+            border: none;
+            border-radius: 10px;
+            background-color: rgba(255, 255, 255, 0.85);
+            font-size: 15px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .input-group input:focus {
+            background-color: white;
+            box-shadow: 0 0 8px rgba(0, 188, 212, 0.7);
+        }
+
+        .input-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #555;
+            font-size: 16px;
+        }
+
+        .forgot-password {
+            display: block;
+            text-align: right;
+            font-size: 13px;
+            margin-bottom: 15px;
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            transition: 0.2s;
+        }
+
+        .forgot-password:hover {
+            color: #00bcd4;
+            text-decoration: underline;
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(45deg, #3498db, #2ecc71);
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            transition: all 0.3s ease-in-out;
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, #2ecc71, #3498db);
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .alert-success {
+            background-color: rgba(46, 204, 113, 0.85);
+            color: white;
+        }
+        .alert-danger {
+            background-color: rgba(231, 76, 60, 0.85);
+            color: white;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-light d-flex justify-content-center align-items-center" style="height: 100vh;">
-    <div class="card shadow p-4" style="width: 350px;">
-        <h3 class="text-center">Login</h3>
-        <form method="POST" action="/login">
-            <div class="mb-3">
-                <label class="form-label">Username</label>
-                <input type="text" name="username" class="form-control" required autofocus>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Login</button>
-        </form>
+<body>
+    <div class="login-container">
+        <h2>🔐 Admin Login</h2>
+
+        <!-- Flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="mt-3">
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} p-2 text-center">{{ message }}</div>
-                {% endfor %}
-                </div>
+    {% if messages %}
+        {% for category, message in messages %}
+            {% if category != 'success' %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
             {% endif %}
-        {% endwith %}
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+
+        <form action="/login" method="POST">
+            <div class="input-group">
+                <input type="text" name="username" placeholder="Enter Username" required>
+                <i class="fas fa-user input-icon"></i>
+            </div>
+            <div class="input-group">
+                <input type="password" name="password" placeholder="Enter Password" required>
+                <i class="fas fa-lock input-icon"></i>
+            </div>
+
+            <!-- Forgot password link -->
+            <a href="{{ url_for('forgot_password') }}" class="forgot-password">Forgot Password?</a>
+
+            <button type="submit">Login</button>
+        </form>
+        <div class="footer-text">📚 Library Visitor Log System</div>
     </div>
 </body>
 </html>
