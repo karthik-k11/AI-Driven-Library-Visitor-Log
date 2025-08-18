@@ -312,7 +312,7 @@ def search_visitors():
     if end_date:
         query += " AND DATE(visit_time) <= DATE(?)"
         params.append(end_date)
-
+        
     query += " ORDER BY id DESC"
 
     cur.execute(query, params)
