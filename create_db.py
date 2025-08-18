@@ -8,9 +8,8 @@ CREATE TABLE IF NOT EXISTS visitors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id TEXT NOT NULL,
     name TEXT NOT NULL,
+    department TEXT NOT NUll, 
     visit_time TEXT NOT NULL,
-    image_path TEXT,
-    face_match_status TEXT
 )
 ''')
 

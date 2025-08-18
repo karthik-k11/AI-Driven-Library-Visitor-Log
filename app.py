@@ -70,7 +70,7 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         default_password = generate_password_hash("admin123")
         cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("kle_library", default_password))
-        print("✅ Default admin user created (username: kle_library, password: admin123)")
+        print(" Default admin user created (username: kle_library, password: admin123)")
 
     conn.commit()
     conn.close()
