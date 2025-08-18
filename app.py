@@ -15,7 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ==================== CONFIG ====================
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Change in production
+app.secret_key = "supersecretkey"  
 
 # Tesseract path
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
