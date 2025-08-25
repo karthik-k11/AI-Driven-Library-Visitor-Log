@@ -53,5 +53,3 @@ An AI-powered system that automates student registration in libraries using **OC
 - OCR accuracy depends on ID card quality & lighting.  
 - Currently supports **specific ID formats** (college-based).  
 - Advanced features like **face recognition** are not yet implemented.  
-
----
