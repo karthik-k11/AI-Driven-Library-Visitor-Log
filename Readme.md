@@ -41,3 +41,10 @@ An AI-powered system that automates student registration in libraries using **OC
 - **HTML + CSS (Jinja2)** – Web templates  
 
 ---
+
+## 🎯 Scope  
+- Provides a **low-cost, automated solution** for maintaining digital visitor records.  
+- Saves time for librarians and reduces manual entry errors.  
+- Can be extended with **face recognition, QR scanning, and analytics**.  
+
+---
